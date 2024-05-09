@@ -1,0 +1,65 @@
+name: generate-rules-for-clash
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+      - '*.yaml'
+      - '.github/workflows/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Generate version
+        run: |
+          VERSION="v1.0.0"  
+                  
+          RELEASE_NAME="Clash Rules ${VERSION}.$(git rev-parse --short HEAD)"
+          TAG_NAME=$(date +%Y%m%d%H%M)
+
+          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+
+      - name: Generate rules file
+        run: |
+          mkdir publish
+          for file in $(find $PWD -name "*rules.yaml" | xargs ls -d); do
+          curl -sSL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/master/$(basename $file)" > "./publish/$(basename $file)"
+          done
+
+      - name: Release and upload assets
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ env.RELEASE_NAME }}
+          tag_name: ${{ env.TAG_NAME }}
+          draft: false
+          prerelease: false
+          files: |
+            ./publish/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push release branch
+        run: |
+          cd publish || exit 1
+          git init
+          git config --local user.name "github-actions"
+          git config --local user.email "41898282+github-actions@users.noreply.github.com"
+          git checkout -b release
+          git add .
+          git commit -m "${{ env.RELEASE_NAME }}"
+          git remote add origin "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
+          git push -f origin release
+
+      - name: Purge jsdelivr CDN
+        run: |
+          cd publish || exit 1
+          for file in $(ls); do
+            curl -i "https://purge.jsdelivr.net/gh/${{ github.repository }}@release/${file}"
+          done
