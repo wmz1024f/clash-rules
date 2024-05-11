@@ -18,7 +18,7 @@ jobs:
 
       - name: Generate version
         run: |
-          VERSION="v1.0.0"  
+          VERSION="v1.0.1"  
                   
           RELEASE_NAME="Clash Rules ${VERSION}.$(git rev-parse --short HEAD)"
           TAG_NAME=$(date +%Y%m%d%H%M)
